@@ -1,3 +1,5 @@
+$ErrorActionPreference = "Stop"
+
 $SyncMessages = @()
 $Timestamp = (Get-Date).ToString("yyyy-MM-ddThh:mm:ss")
 $Username=""
@@ -35,6 +37,8 @@ $Headers = @{
 $Body = $SyncMessages | ConvertTo-Json
 
 Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/sync" -Method Post -Headers $Headers -Body $Body
+Write-Host "Successfully synced local progress with remote server"
+Write-Host
 
 $Progress = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/progress"
 $Progress.episodes_per_show_watched.PsObject.Properties |
