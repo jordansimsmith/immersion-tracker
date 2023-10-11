@@ -4,9 +4,9 @@ import static com.jordansimsmith.immersion.tracker.jooq.Tables.EPISODE;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.Record2;
@@ -50,8 +50,10 @@ public class ImmersionTrackerController {
         int totalEpisodesWatched =
                 showsWatched.stream().map(Record2::value2).reduce(0, Integer::sum);
         int totalHoursWatched = totalEpisodesWatched * MINUTES_PER_EPISODE / 60;
-        var episodesPerShowWatched =
-                showsWatched.stream().collect(Collectors.toMap(Record2::value1, Record2::value2));
+        var episodesPerShowWatched = new LinkedHashMap<String, Integer>();
+        showsWatched.stream()
+                .sorted((a, b) -> b.value2() - a.value2())
+                .forEach(s -> episodesPerShowWatched.put(s.value1(), s.value2()));
 
         return new ProgressMessage(totalEpisodesWatched, totalHoursWatched, episodesPerShowWatched);
     }
