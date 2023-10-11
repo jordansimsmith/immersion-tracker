@@ -1,0 +1,7 @@
+Dockerfile
+.dockerignore
+.idea/
+.gradle/
+build/*
+!build/generated-src/
+migrations/
