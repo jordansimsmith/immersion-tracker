@@ -71,13 +71,14 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-jooq'
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'org.postgresql:postgresql'
-    jooqGenerator 'org.postgresql:postgresql'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    implementation 'org.springframework.boot:spring-boot-starter:3.1.4'
+    implementation 'org.springframework.boot:spring-boot-starter-web:3.1.4'
+    implementation 'org.springframework.boot:spring-boot-starter-jooq:3.1.4'
+    implementation 'org.springframework.boot:spring-boot-starter-security:3.1.4'
+    implementation 'org.postgresql:postgresql:42.6.0'
+    implementation 'org.jfree:jfreechart:1.5.4'
+    jooqGenerator 'org.postgresql:postgresql:42.6.0'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test:3.1.4'
 }
 
 tasks.named('test') {
