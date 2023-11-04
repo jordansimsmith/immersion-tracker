@@ -16,6 +16,8 @@ FROM amazoncorretto:17-alpine AS run
 
 WORKDIR /app
 
+RUN apk update && apk add fontconfig
+
 COPY --from=build /app/build/libs/immersion.tracker-0.0.1-SNAPSHOT.jar app.jar
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
