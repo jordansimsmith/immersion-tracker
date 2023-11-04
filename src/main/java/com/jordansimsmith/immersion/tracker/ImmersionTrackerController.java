@@ -6,15 +6,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
-import org.jfree.chart.plot.PlotOrientation;
-import org.jfree.data.category.DefaultCategoryDataset;
+import org.jfree.data.time.Month;
+import org.jfree.data.time.TimeSeries;
+import org.jfree.data.time.TimeSeriesCollection;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.DatePart;
@@ -79,27 +79,25 @@ public class ImmersionTrackerController {
                         .orderBy(year.asc(), month.asc())
                         .fetch();
 
-        var dataset = new DefaultCategoryDataset();
-        // immersion start date
-        dataset.addValue(0, "episodes", LocalDate.of(2023, 5, 1));
+        var series = new TimeSeries("episodes");
+        series.add(new Month(5, 2023), 0); // immersion start date
         var sum = 0;
         for (var episodes : episodesPerMonth) {
             sum += episodes.value3();
-            var date = LocalDate.of(episodes.value1(), episodes.value2(), 1);
-            dataset.addValue(sum, "episodes", date);
+            series.add(new Month(episodes.value2(), episodes.value1()), sum);
         }
+        var dataset = new TimeSeriesCollection(series);
 
         var chart =
-                ChartFactory.createLineChart(
+                ChartFactory.createTimeSeriesChart(
                         "accumulation of episodes watched",
                         "month",
                         "episodes watched",
                         dataset,
-                        PlotOrientation.VERTICAL,
                         false,
                         false,
                         false);
-        var plot = chart.getCategoryPlot();
+        var plot = chart.getXYPlot();
         plot.setBackgroundPaint(Color.white);
         plot.setDomainGridlinePaint(Color.white);
         plot.setRangeGridlinePaint(Color.white);
