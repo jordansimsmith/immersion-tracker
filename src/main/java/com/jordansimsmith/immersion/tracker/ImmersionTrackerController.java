@@ -11,6 +11,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import jakarta.servlet.http.HttpServletResponse;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
 import org.jfree.data.time.Day;
@@ -73,7 +75,7 @@ public class ImmersionTrackerController {
     }
 
     @GetMapping(value = "/chart", produces = MediaType.IMAGE_PNG_VALUE)
-    public byte[] chart() throws IOException {
+    public byte[] chart(HttpServletResponse res) throws IOException {
         var year = DSL.extract(EPISODE.TIMESTAMP, DatePart.YEAR).as("year");
         var month = DSL.extract(EPISODE.TIMESTAMP, DatePart.MONTH).as("month");
         var day = DSL.extract(EPISODE.TIMESTAMP, DatePart.DAY).as("day");
@@ -107,6 +109,8 @@ public class ImmersionTrackerController {
         plot.setDomainGridlinePaint(Color.white);
         plot.setRangeGridlinePaint(Color.white);
         plot.setOutlineVisible(false);
+
+        res.setHeader("Cache-Control", "no-cache");
 
         try (var outputStream = new ByteArrayOutputStream()) {
             ChartUtils.writeChartAsPNG(outputStream, chart, 800, 600);
