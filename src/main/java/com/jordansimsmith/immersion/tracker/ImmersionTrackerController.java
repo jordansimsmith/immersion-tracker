@@ -10,8 +10,10 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
+import org.jfree.data.time.Day;
 import org.jfree.data.time.Month;
 import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
@@ -29,16 +31,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class ImmersionTrackerController {
-    public record ProgressMessage(
+    public record ProgressResponse(
             @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
             @JsonProperty("total_hours_watched") int totalHoursWatched,
             @JsonProperty("episodes_per_show_watched")
                     Map<String, Integer> episodesPerShowWatched) {}
 
-    public record SyncMessage(
+    public record SyncRequest(
             @JsonProperty("folder_name") String folderName,
             @JsonProperty("file_name") String fileName,
             @JsonProperty("timestamp") LocalDateTime timestamp) {}
+
+    public record SyncResponse(@JsonProperty("episodes_added") int episodesAdded) {}
 
     private static final int MINUTES_PER_EPISODE = 20;
 
@@ -50,7 +54,7 @@ public class ImmersionTrackerController {
     }
 
     @GetMapping("/progress")
-    public ProgressMessage progress() {
+    public ProgressResponse progress() {
         var showsWatched =
                 create.select(EPISODE.FOLDER_NAME, DSL.count().as("episodes_watched"))
                         .from(EPISODE)
@@ -65,33 +69,35 @@ public class ImmersionTrackerController {
                 .sorted((a, b) -> b.value2() - a.value2())
                 .forEach(s -> episodesPerShowWatched.put(s.value1(), s.value2()));
 
-        return new ProgressMessage(totalEpisodesWatched, totalHoursWatched, episodesPerShowWatched);
+        return new ProgressResponse(
+                totalEpisodesWatched, totalHoursWatched, episodesPerShowWatched);
     }
 
     @GetMapping(value = "/chart", produces = MediaType.IMAGE_PNG_VALUE)
     public byte[] chart() throws IOException {
         var year = DSL.extract(EPISODE.TIMESTAMP, DatePart.YEAR).as("year");
         var month = DSL.extract(EPISODE.TIMESTAMP, DatePart.MONTH).as("month");
+        var day = DSL.extract(EPISODE.TIMESTAMP, DatePart.DAY).as("day");
         var episodesPerMonth =
-                create.select(year, month, DSL.count().as("episodes_watched"))
+                create.select(year, month, day, DSL.count().as("episodes_watched"))
                         .from(EPISODE)
-                        .groupBy(year, month)
-                        .orderBy(year.asc(), month.asc())
+                        .groupBy(year, month, day)
+                        .orderBy(year.asc(), month.asc(), day.asc())
                         .fetch();
 
         var series = new TimeSeries("episodes");
-        series.add(new Month(5, 2023), 0); // immersion start date
+        series.add(new Day(7, 5, 2023), 0); // immersion start date
         var sum = 0;
         for (var episodes : episodesPerMonth) {
-            sum += episodes.value3();
-            series.add(new Month(episodes.value2(), episodes.value1()), sum);
+            sum += episodes.value4();
+            series.add(new Day(episodes.value3(), episodes.value2(), episodes.value1()), sum);
         }
         var dataset = new TimeSeriesCollection(series);
 
         var chart =
                 ChartFactory.createTimeSeriesChart(
-                        "accumulation of episodes watched",
-                        "month",
+                        "episodes watched over time",
+                        "time",
                         "episodes watched",
                         dataset,
                         false,
@@ -110,10 +116,11 @@ public class ImmersionTrackerController {
     }
 
     @PostMapping("/sync")
-    public void sync(@RequestBody List<SyncMessage> syncMessages) {
+    public SyncResponse sync(@RequestBody List<SyncRequest> syncRequests) {
+        var episodesAdded = new AtomicInteger();
         create.transaction(
                 (Configuration txn) -> {
-                    for (var syncMessage : syncMessages) {
+                    for (var syncMessage : syncRequests) {
                         var episode =
                                 txn.dsl()
                                         .selectFrom(EPISODE)
@@ -126,8 +133,11 @@ public class ImmersionTrackerController {
                             episode.setFileName(syncMessage.fileName());
                             episode.setTimestamp(syncMessage.timestamp());
                             episode.insert();
+                            episodesAdded.getAndIncrement();
                         }
                     }
                 });
+
+        return new SyncResponse(episodesAdded.get());
     }
 }
