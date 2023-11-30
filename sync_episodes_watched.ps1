@@ -36,8 +36,8 @@ $Headers = @{
 
 $Body = $SyncMessages | ConvertTo-Json
 
-Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/sync" -Method Post -Headers $Headers -Body $Body
-Write-Host "Successfully synced local progress with remote server"
+$Sync = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/sync" -Method Post -Headers $Headers -Body $Body
+Write-Host "Successfully synced" $Sync.episodes_added "new episodes with the remote server"
 Write-Host
 
 $Progress = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/progress"
