@@ -32,8 +32,8 @@ jobs:
 
       - name: Push version number
         run: |
-          git config --global user.name 'Jordan Sim-Smith'
-          git config --global user.email 'jordansimsmith@gmail.com'
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
           git add ./powershell/ImmersionTracker/ImmersionTracker.psd1
           git commit -m "[skip ci] Bump powershell module version"
           git push
