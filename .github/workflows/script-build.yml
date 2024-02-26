@@ -1,0 +1,19 @@
+name: Script build workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Publish powershell module
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Publish powershell module
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        shell: pwsh
+        run: Publish-Module -Path $PSModuleRoot\powershell\ImmersionTracker -NugetApiKey $env:NUGET_API_KEY -Verbose

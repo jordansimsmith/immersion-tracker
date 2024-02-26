@@ -1,4 +1,4 @@
-name: Server Build Workflow
+name: Server build workflow
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v3
