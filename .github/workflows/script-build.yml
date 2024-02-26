@@ -7,13 +7,33 @@ jobs:
   build:
     name: Publish powershell module
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Bump version number
+        shell: pwsh
+        run: |
+          $ModuleInfo = Import-PowershellDataFile -Path .\powershell\ImmersionTracker\ImmersionTracker.psd1
+          $Version = $ModuleInfo.ModuleVersion
+          $MajorVersion = $Version.Split('.')[0]
+          $MinorVersion = $Version.Split('.')[-1]
+          $NewVersion = $MajorVersion + '.' + ([int]$MinorVersion + 1)
+          Update-ModuleManifest -Path .\powershell\ImmersionTracker\ImmersionTracker.psd1 -ModuleVersion $NewVersion
 
       - name: Publish powershell module
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         shell: pwsh
         run: Publish-Module -Path .\powershell\ImmersionTracker -NugetApiKey $env:NUGET_API_KEY -Verbose
+
+      - name: Push version number
+        run: |
+          git config --global user.name 'Jordan Sim-Smith'
+          git config --global user.email 'jordansimsmith@gmail.com'
+          git add ./powershell/ImmersionTracker/ImmersionTracker.psd1
+          git commit -m "[skip ci] Bump powershell module version"
+          git push
