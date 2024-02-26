@@ -1,3 +1,10 @@
 ﻿function Sync-Episodes-Watched {
-    Write-Host "Hello"
+    [CmdletBinding()]
+    param (
+        [string] $Username,
+        [string] $Password
+    )
+    process {
+        Write-Host 'Hello' + $Username + $Password
+    }
 }

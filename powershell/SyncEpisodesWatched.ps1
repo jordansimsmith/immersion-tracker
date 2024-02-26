@@ -1,3 +1,5 @@
+$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+
 if (-Not (Get-Module -ListAvailable -Name ImmersionTracker)) {
     Write-Host "installing module..."
     Install-Module -Name 'ImmersionTracker'
@@ -7,4 +9,6 @@ else {
     Update-Module -Name 'ImmersionTracker'
 }
 
-Sync-Episodes-Watched
+$Username = 'username'
+$Password = 'password'
+Sync-Episodes-Watched -Username $Username -Password $Password
