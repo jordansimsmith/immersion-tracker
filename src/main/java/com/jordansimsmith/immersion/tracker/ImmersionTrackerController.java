@@ -131,9 +131,13 @@ public class ImmersionTrackerController {
             var row =
                     episode.getId()
                             + ","
+                            + "\""
                             + episode.getFileName()
+                            + "\""
                             + ","
+                            + "\""
                             + episode.getFolderName()
+                            + "\""
                             + ","
                             + episode.getTimestamp();
             builder.append(row);
