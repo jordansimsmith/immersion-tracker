@@ -9,6 +9,4 @@ else {
     Update-Module -Name 'ImmersionTracker'
 }
 
-$Username = 'username'
-$Password = 'password'
-Sync-Episodes-Watched $Username $Password
+Sync-Episodes-Watched -Username 'username' -Password 'password'
