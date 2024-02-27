@@ -117,6 +117,32 @@ public class ImmersionTrackerController {
         }
     }
 
+    @GetMapping(value = "/csv", produces = "text/csv")
+    public String csv() {
+        var episodes =
+                create.selectFrom(EPISODE)
+                        .orderBy(EPISODE.TIMESTAMP.asc(), EPISODE.ID.asc())
+                        .fetch();
+        var builder = new StringBuilder();
+        builder.append("id,file_name,folder_name,timestamp");
+        builder.append("\n");
+
+        for (var episode : episodes) {
+            var row =
+                    episode.getId()
+                            + ","
+                            + episode.getFileName()
+                            + ","
+                            + episode.getFolderName()
+                            + ","
+                            + episode.getTimestamp();
+            builder.append(row);
+            builder.append("\n");
+        }
+
+        return builder.toString();
+    }
+
     @PostMapping("/sync")
     public SyncResponse sync(@RequestBody List<SyncRequest> syncRequests) {
         var episodesAdded = new AtomicInteger();

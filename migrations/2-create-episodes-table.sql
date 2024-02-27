@@ -4,4 +4,4 @@ CREATE TABLE episode
     file_name   TEXT      NOT NULL,
     folder_name TEXT      NOT NULL,
     timestamp   TIMESTAMP NOT NULL
-)
+);
