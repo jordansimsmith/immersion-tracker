@@ -92,10 +92,9 @@ function Get-Remote-Episodes-Watched {
         Write-Host
 
         $Progress = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/progress"
-        $Progress.episodes_per_show_watched.PsObject.Properties |
+        $Progress.shows_watched |
         Foreach-Object {
-            $DisplayName = $_.Name -replace "\[[^\]]*\]\s?" -replace "\([^\)]*\)\s?"
-            Write-Host $_.Value "episodes of" $DisplayName
+            Write-Host "$($_.episodes_watched) episodes of $($_.name)"
         }
 
         Write-Host
