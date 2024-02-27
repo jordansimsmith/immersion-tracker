@@ -9,4 +9,9 @@ else {
     Update-Module -Name 'ImmersionTracker'
 }
 
-Sync-Episodes-Watched -Username 'username' -Password 'password'
+try {
+    Sync-Episodes-Watched -Username 'username' -Password 'password'
+}
+finally {
+    Pause
+}
