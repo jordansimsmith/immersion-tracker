@@ -5,8 +5,11 @@ package com.jordansimsmith.immersion.tracker.jooq;
 
 
 import com.jordansimsmith.immersion.tracker.jooq.tables.Episode;
+import com.jordansimsmith.immersion.tracker.jooq.tables.Show;
 import com.jordansimsmith.immersion.tracker.jooq.tables.records.EpisodeRecord;
+import com.jordansimsmith.immersion.tracker.jooq.tables.records.ShowRecord;
 
+import org.jooq.ForeignKey;
 import org.jooq.TableField;
 import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
@@ -25,4 +28,11 @@ public class Keys {
     // -------------------------------------------------------------------------
 
     public static final UniqueKey<EpisodeRecord> EPISODE_PKEY = Internal.createUniqueKey(Episode.EPISODE, DSL.name("episode_pkey"), new TableField[] { Episode.EPISODE.ID }, true);
+    public static final UniqueKey<ShowRecord> SHOW_PKEY = Internal.createUniqueKey(Show.SHOW, DSL.name("show_pkey"), new TableField[] { Show.SHOW.ID }, true);
+
+    // -------------------------------------------------------------------------
+    // FOREIGN KEY definitions
+    // -------------------------------------------------------------------------
+
+    public static final ForeignKey<EpisodeRecord, ShowRecord> EPISODE__EPISODE_SHOW_ID_FKEY = Internal.createForeignKey(Episode.EPISODE, DSL.name("episode_show_id_fkey"), new TableField[] { Episode.EPISODE.SHOW_ID }, Keys.SHOW_PKEY, new TableField[] { Show.SHOW.ID }, true);
 }

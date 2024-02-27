@@ -1,6 +1,7 @@
 package com.jordansimsmith.immersion.tracker;
 
 import static com.jordansimsmith.immersion.tracker.jooq.Tables.EPISODE;
+import static com.jordansimsmith.immersion.tracker.jooq.Tables.SHOW;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.servlet.http.HttpServletResponse;
@@ -8,9 +9,8 @@ import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
@@ -20,7 +20,6 @@ import org.jfree.data.time.TimeSeriesCollection;
 import org.jooq.Configuration;
 import org.jooq.DSLContext;
 import org.jooq.DatePart;
-import org.jooq.Record2;
 import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -34,8 +33,11 @@ public class ImmersionTrackerController {
     public record ProgressResponse(
             @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
             @JsonProperty("total_hours_watched") int totalHoursWatched,
-            @JsonProperty("episodes_per_show_watched")
-                    Map<String, Integer> episodesPerShowWatched) {}
+            @JsonProperty("shows_watched") List<ShowProgress> showsWatched) {}
+
+    public record ShowProgress(
+            @JsonProperty("name") String name,
+            @JsonProperty("episodes_watched") int episodesWatched) {}
 
     public record SyncRequest(
             @JsonProperty("folder_name") String folderName,
@@ -46,31 +48,39 @@ public class ImmersionTrackerController {
 
     private static final int MINUTES_PER_EPISODE = 20;
 
-    private final DSLContext create;
+    private final DSLContext ctx;
 
     @Autowired
-    public ImmersionTrackerController(DSLContext create) {
-        this.create = create;
+    public ImmersionTrackerController(DSLContext ctx) {
+        this.ctx = ctx;
     }
 
     @GetMapping("/progress")
     public ProgressResponse progress() {
-        var showsWatched =
-                create.select(EPISODE.FOLDER_NAME, DSL.count().as("episodes_watched"))
-                        .from(EPISODE)
-                        .groupBy(EPISODE.FOLDER_NAME)
+        var name = DSL.coalesce(SHOW.TVDB_NAME, SHOW.FOLDER_NAME);
+        var count = DSL.count();
+        var records =
+                ctx.select(name, count)
+                        .from(SHOW)
+                        .join(EPISODE)
+                        .on(SHOW.ID.eq(EPISODE.SHOW_ID))
+                        .groupBy(SHOW.TVDB_ID, SHOW.TVDB_NAME, SHOW.FOLDER_NAME)
+                        .orderBy(count.desc())
                         .fetch();
 
-        int totalEpisodesWatched =
-                showsWatched.stream().map(Record2::value2).reduce(0, Integer::sum);
+        var totalEpisodesWatched = 0;
+        for (var record : records) {
+            totalEpisodesWatched += record.value2();
+        }
         int totalHoursWatched = totalEpisodesWatched * MINUTES_PER_EPISODE / 60;
-        var episodesPerShowWatched = new LinkedHashMap<String, Integer>();
-        showsWatched.stream()
-                .sorted((a, b) -> b.value2() - a.value2())
-                .forEach(s -> episodesPerShowWatched.put(s.value1(), s.value2()));
 
-        return new ProgressResponse(
-                totalEpisodesWatched, totalHoursWatched, episodesPerShowWatched);
+        var showsWatched = new ArrayList<ShowProgress>();
+        for (var record : records) {
+            var show = new ShowProgress(record.value1(), record.value2());
+            showsWatched.add(show);
+        }
+
+        return new ProgressResponse(totalEpisodesWatched, totalHoursWatched, showsWatched);
     }
 
     @GetMapping(value = "/chart", produces = MediaType.IMAGE_PNG_VALUE)
@@ -79,7 +89,7 @@ public class ImmersionTrackerController {
         var month = DSL.extract(EPISODE.TIMESTAMP, DatePart.MONTH).as("month");
         var day = DSL.extract(EPISODE.TIMESTAMP, DatePart.DAY).as("day");
         var episodesPerMonth =
-                create.select(year, month, day, DSL.count().as("episodes_watched"))
+                ctx.select(year, month, day, DSL.count().as("episodes_watched"))
                         .from(EPISODE)
                         .groupBy(year, month, day)
                         .orderBy(year.asc(), month.asc(), day.asc())
@@ -119,49 +129,55 @@ public class ImmersionTrackerController {
 
     @GetMapping(value = "/csv", produces = "text/csv")
     public String csv() {
-        var episodes =
-                create.selectFrom(EPISODE)
-                        .orderBy(EPISODE.TIMESTAMP.asc(), EPISODE.ID.asc())
-                        .fetch();
-        var builder = new StringBuilder();
-        builder.append("id,file_name,folder_name,timestamp");
-        builder.append("\n");
-
-        for (var episode : episodes) {
-            var row =
-                    episode.getId()
-                            + ","
-                            + "\""
-                            + episode.getFileName()
-                            + "\""
-                            + ","
-                            + "\""
-                            + episode.getFolderName()
-                            + "\""
-                            + ","
-                            + episode.getTimestamp();
-            builder.append(row);
-            builder.append("\n");
-        }
-
-        return builder.toString();
+        return ctx.select(
+                        EPISODE.ID,
+                        EPISODE.FILE_NAME,
+                        EPISODE.TIMESTAMP,
+                        SHOW.ID.as("show_id"),
+                        SHOW.FOLDER_NAME,
+                        SHOW.TVDB_ID,
+                        SHOW.TVDB_NAME,
+                        SHOW.TVDB_IMAGE)
+                .from(EPISODE)
+                .leftJoin(SHOW)
+                .on(EPISODE.SHOW_ID.eq(SHOW.ID))
+                .orderBy(EPISODE.TIMESTAMP.asc(), EPISODE.ID.asc())
+                .fetch()
+                .formatCSV();
     }
 
     @PostMapping("/sync")
     public SyncResponse sync(@RequestBody List<SyncRequest> syncRequests) {
         var episodesAdded = new AtomicInteger();
-        create.transaction(
+        ctx.transaction(
                 (Configuration txn) -> {
                     for (var syncMessage : syncRequests) {
+                        // check if the show already exists
+                        var show =
+                                txn.dsl()
+                                        .selectFrom(SHOW)
+                                        .where(SHOW.FOLDER_NAME.eq(syncMessage.folderName()))
+                                        .fetchAny();
+
+                        // create the show if it doesn't exist
+                        if (show == null) {
+                            show = txn.dsl().newRecord(SHOW);
+                            show.setFolderName(syncMessage.folderName());
+                            show.insert();
+                        }
+
+                        // check if the episode exists already
                         var episode =
                                 txn.dsl()
                                         .selectFrom(EPISODE)
-                                        .where(EPISODE.FOLDER_NAME.eq(syncMessage.folderName()))
+                                        .where(EPISODE.SHOW_ID.eq(show.getId()))
                                         .and(EPISODE.FILE_NAME.eq(syncMessage.fileName()))
                                         .fetchAny();
+
+                        // create the episode if it doesn't exist
                         if (episode == null) {
                             episode = txn.dsl().newRecord(EPISODE);
-                            episode.setFolderName(syncMessage.folderName());
+                            episode.setShowId(show.getId());
                             episode.setFileName(syncMessage.fileName());
                             episode.setTimestamp(syncMessage.timestamp());
                             episode.insert();

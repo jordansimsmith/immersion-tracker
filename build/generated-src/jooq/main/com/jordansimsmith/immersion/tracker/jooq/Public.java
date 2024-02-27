@@ -5,6 +5,7 @@ package com.jordansimsmith.immersion.tracker.jooq;
 
 
 import com.jordansimsmith.immersion.tracker.jooq.tables.Episode;
+import com.jordansimsmith.immersion.tracker.jooq.tables.Show;
 
 import java.util.Arrays;
 import java.util.List;
@@ -33,6 +34,11 @@ public class Public extends SchemaImpl {
     public final Episode EPISODE = Episode.EPISODE;
 
     /**
+     * The table <code>public.show</code>.
+     */
+    public final Show SHOW = Show.SHOW;
+
+    /**
      * No further instances allowed
      */
     private Public() {
@@ -48,7 +54,8 @@ public class Public extends SchemaImpl {
     @Override
     public final List<Table<?>> getTables() {
         return Arrays.asList(
-            Episode.EPISODE
+            Episode.EPISODE,
+            Show.SHOW
         );
     }
 }

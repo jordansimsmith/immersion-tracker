@@ -9,6 +9,8 @@ import com.jordansimsmith.immersion.tracker.jooq.Public;
 import com.jordansimsmith.immersion.tracker.jooq.tables.records.EpisodeRecord;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 
 import org.jooq.Field;
@@ -62,14 +64,14 @@ public class Episode extends TableImpl<EpisodeRecord> {
     public final TableField<EpisodeRecord, String> FILE_NAME = createField(DSL.name("file_name"), SQLDataType.CLOB.nullable(false), this, "");
 
     /**
-     * The column <code>public.episode.folder_name</code>.
-     */
-    public final TableField<EpisodeRecord, String> FOLDER_NAME = createField(DSL.name("folder_name"), SQLDataType.CLOB.nullable(false), this, "");
-
-    /**
      * The column <code>public.episode.timestamp</code>.
      */
     public final TableField<EpisodeRecord, LocalDateTime> TIMESTAMP = createField(DSL.name("timestamp"), SQLDataType.LOCALDATETIME(6).nullable(false), this, "");
+
+    /**
+     * The column <code>public.episode.show_id</code>.
+     */
+    public final TableField<EpisodeRecord, Integer> SHOW_ID = createField(DSL.name("show_id"), SQLDataType.INTEGER, this, "");
 
     private Episode(Name alias, Table<EpisodeRecord> aliased) {
         this(alias, aliased, null);
@@ -120,6 +122,23 @@ public class Episode extends TableImpl<EpisodeRecord> {
     }
 
     @Override
+    public List<ForeignKey<EpisodeRecord, ?>> getReferences() {
+        return Arrays.asList(Keys.EPISODE__EPISODE_SHOW_ID_FKEY);
+    }
+
+    private transient Show _show;
+
+    /**
+     * Get the implicit join path to the <code>public.show</code> table.
+     */
+    public Show show() {
+        if (_show == null)
+            _show = new Show(this, Keys.EPISODE__EPISODE_SHOW_ID_FKEY);
+
+        return _show;
+    }
+
+    @Override
     public Episode as(String alias) {
         return new Episode(DSL.name(alias), this);
     }
@@ -163,14 +182,14 @@ public class Episode extends TableImpl<EpisodeRecord> {
     // -------------------------------------------------------------------------
 
     @Override
-    public Row4<Integer, String, String, LocalDateTime> fieldsRow() {
+    public Row4<Integer, String, LocalDateTime, Integer> fieldsRow() {
         return (Row4) super.fieldsRow();
     }
 
     /**
      * Convenience mapping calling {@link SelectField#convertFrom(Function)}.
      */
-    public <U> SelectField<U> mapping(Function4<? super Integer, ? super String, ? super String, ? super LocalDateTime, ? extends U> from) {
+    public <U> SelectField<U> mapping(Function4<? super Integer, ? super String, ? super LocalDateTime, ? super Integer, ? extends U> from) {
         return convertFrom(Records.mapping(from));
     }
 
@@ -178,7 +197,7 @@ public class Episode extends TableImpl<EpisodeRecord> {
      * Convenience mapping calling {@link SelectField#convertFrom(Class,
      * Function)}.
      */
-    public <U> SelectField<U> mapping(Class<U> toType, Function4<? super Integer, ? super String, ? super String, ? super LocalDateTime, ? extends U> from) {
+    public <U> SelectField<U> mapping(Class<U> toType, Function4<? super Integer, ? super String, ? super LocalDateTime, ? super Integer, ? extends U> from) {
         return convertFrom(toType, Records.mapping(from));
     }
 }
