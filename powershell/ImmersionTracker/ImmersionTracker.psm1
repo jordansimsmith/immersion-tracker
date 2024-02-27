@@ -1,4 +1,4 @@
-﻿function Sync-Episodes-Watched2 {
+﻿function Sync-Episodes-Watched {
     [CmdletBinding()]
     param (
         [Parameter(mandatory = $true)][string] $Username,

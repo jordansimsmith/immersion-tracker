@@ -11,4 +11,4 @@ else {
 
 $Username = 'username'
 $Password = 'password'
-Sync-Episodes-Watched -Username $Username -Password $Password
+Sync-Episodes-Watched $Username $Password
