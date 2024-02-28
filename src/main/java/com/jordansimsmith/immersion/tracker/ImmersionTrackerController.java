@@ -35,14 +35,17 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 @RestController
 public class ImmersionTrackerController {
-    public record ListShowsResponse(
+    public record ProgressResponse(
             @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
             @JsonProperty("total_hours_watched") int totalHoursWatched,
-            @JsonProperty("shows") List<Show> shows) {}
+            @JsonProperty("shows") List<ShowProgress> shows) {}
+
+    public record ShowProgress(
+            @Nullable @JsonProperty("name") String name,
+            @JsonProperty("episodes_watched") int episodesWatched) {}
 
     public record Show(
             @JsonProperty("id") int id,
-            @JsonProperty("episodes_watched") int episodesWatched,
             @JsonProperty("folder_name") String folderName,
             @Nullable @JsonProperty("tvdb_id") Integer tvdbId,
             @Nullable @JsonProperty("tvdb_name") String tvdbName,
@@ -68,48 +71,49 @@ public class ImmersionTrackerController {
         this.ctx = ctx;
     }
 
-    @GetMapping("/shows")
-    public ListShowsResponse listShows() {
+    @GetMapping("/progress")
+    public ProgressResponse progress() {
         var records =
-                ctx.select(
-                                SHOW.ID,
-                                DSL.count(),
-                                SHOW.FOLDER_NAME,
-                                SHOW.TVDB_ID,
-                                SHOW.TVDB_NAME,
-                                SHOW.TVDB_IMAGE)
+                ctx.select(SHOW.TVDB_ID, SHOW.TVDB_NAME, DSL.count())
                         .from(SHOW)
                         .join(EPISODE)
                         .on(SHOW.ID.eq(EPISODE.SHOW_ID))
-                        .groupBy(
-                                SHOW.ID,
-                                SHOW.FOLDER_NAME,
-                                SHOW.TVDB_ID,
-                                SHOW.TVDB_NAME,
-                                SHOW.TVDB_IMAGE)
+                        .groupBy(SHOW.TVDB_ID, SHOW.TVDB_NAME)
                         .orderBy(DSL.count().desc())
                         .fetch();
 
         var totalEpisodesWatched = 0;
         for (var record : records) {
-            totalEpisodesWatched += record.value2();
+            totalEpisodesWatched += record.value3();
         }
         int totalHoursWatched = totalEpisodesWatched * MINUTES_PER_EPISODE / 60;
 
-        var showsWatched = new ArrayList<Show>();
+        var shows = new ArrayList<ShowProgress>();
+        for (var record : records) {
+            var show = new ShowProgress(record.value2(), record.value3());
+            shows.add(show);
+        }
+
+        return new ProgressResponse(totalEpisodesWatched, totalHoursWatched, shows);
+    }
+
+    @GetMapping("/shows")
+    public List<Show> listShows() {
+        var records = ctx.selectFrom(SHOW).fetch();
+
+        var shows = new ArrayList<Show>();
         for (var record : records) {
             var show =
                     new Show(
-                            record.value1(),
-                            record.value2(),
-                            record.value3(),
-                            record.value4(),
-                            record.value5(),
-                            record.value6());
-            showsWatched.add(show);
+                            record.getId(),
+                            record.getFolderName(),
+                            record.getTvdbId(),
+                            record.getTvdbName(),
+                            record.getTvdbImage());
+            shows.add(show);
         }
 
-        return new ListShowsResponse(totalEpisodesWatched, totalHoursWatched, showsWatched);
+        return shows;
     }
 
     @PutMapping("/shows/{id}")
