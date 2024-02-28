@@ -4,6 +4,7 @@ import static com.jordansimsmith.immersion.tracker.jooq.Tables.EPISODE;
 import static com.jordansimsmith.immersion.tracker.jooq.Tables.SHOW;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletResponse;
 import java.awt.*;
@@ -12,6 +13,8 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
@@ -23,8 +26,12 @@ import org.jooq.DSLContext;
 import org.jooq.DatePart;
 import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @RestController
 public class ImmersionTrackerController {
@@ -32,17 +39,17 @@ public class ImmersionTrackerController {
             @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
             @JsonProperty("total_hours_watched") int totalHoursWatched,
             @JsonProperty("shows") List<Show> shows) {}
+
     public record Show(
             @JsonProperty("id") int id,
             @JsonProperty("episodes_watched") int episodesWatched,
             @JsonProperty("folder_name") String folderName,
             @Nullable @JsonProperty("tvdb_id") Integer tvdbId,
             @Nullable @JsonProperty("tvdb_name") String tvdbName,
-            @Nullable @JsonProperty("tvdb_image") String tvdbImage
-            ) {}
-    public record UpdateShowRequest(
-            @JsonProperty("tvdb_id") int tvdbId
-    ) {}
+            @Nullable @JsonProperty("tvdb_image") String tvdbImage) {}
+
+    public record UpdateShowRequest(@JsonProperty("tvdb_id") int tvdbId) {}
+
     public record SyncEpisodesRequest(
             @JsonProperty("folder_name") String folderName,
             @JsonProperty("file_name") String fileName,
@@ -52,21 +59,34 @@ public class ImmersionTrackerController {
 
     private static final int MINUTES_PER_EPISODE = 20;
 
+    private final String tvdbApiKey;
     private final DSLContext ctx;
 
     @Autowired
-    public ImmersionTrackerController(DSLContext ctx) {
+    public ImmersionTrackerController(@Value("${tvdb.api.key}") String tvdbApiKey, DSLContext ctx) {
+        this.tvdbApiKey = Objects.requireNonNull(tvdbApiKey);
         this.ctx = ctx;
     }
 
     @GetMapping("/shows")
     public ListShowsResponse listShows() {
         var records =
-                ctx.select(SHOW.ID, DSL.count(), SHOW.FOLDER_NAME, SHOW.TVDB_ID, SHOW.TVDB_NAME, SHOW.TVDB_IMAGE)
+                ctx.select(
+                                SHOW.ID,
+                                DSL.count(),
+                                SHOW.FOLDER_NAME,
+                                SHOW.TVDB_ID,
+                                SHOW.TVDB_NAME,
+                                SHOW.TVDB_IMAGE)
                         .from(SHOW)
                         .join(EPISODE)
                         .on(SHOW.ID.eq(EPISODE.SHOW_ID))
-                        .groupBy(SHOW.ID, SHOW.FOLDER_NAME, SHOW.TVDB_ID, SHOW.TVDB_NAME, SHOW.TVDB_IMAGE)
+                        .groupBy(
+                                SHOW.ID,
+                                SHOW.FOLDER_NAME,
+                                SHOW.TVDB_ID,
+                                SHOW.TVDB_NAME,
+                                SHOW.TVDB_IMAGE)
                         .orderBy(DSL.count().desc())
                         .fetch();
 
@@ -78,7 +98,14 @@ public class ImmersionTrackerController {
 
         var showsWatched = new ArrayList<Show>();
         for (var record : records) {
-            var show = new Show(record.value1(), record.value2(), record.value3(), record.value4(), record.value5(), record.value6());
+            var show =
+                    new Show(
+                            record.value1(),
+                            record.value2(),
+                            record.value3(),
+                            record.value4(),
+                            record.value5(),
+                            record.value6());
             showsWatched.add(show);
         }
 
@@ -86,10 +113,53 @@ public class ImmersionTrackerController {
     }
 
     @PutMapping("/shows/{id}")
-    public void updateShow(@PathVariable(value="id") int id, @RequestBody UpdateShowRequest req) {
-        // TODO: find tvdb series
+    public void updateShow(@PathVariable(value = "id") int id, @RequestBody UpdateShowRequest req) {
+        var client =
+                WebClient.builder()
+                        .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                        .baseUrl("https://api4.thetvdb.com/v4")
+                        .build();
 
-        ctx.update(SHOW).set(SHOW.TVDB_ID, req.tvdbId()).where(SHOW.ID.eq(id)).limit(1).execute();
+        // authenticate and get a bearer token
+        var login =
+                client.post()
+                        .uri("/login")
+                        .body(BodyInserters.fromValue(Map.of("apikey", tvdbApiKey)))
+                        .accept(MediaType.APPLICATION_JSON)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
+        Objects.requireNonNull(login);
+        if (!"success".equals(login.path("status").asText())) {
+            throw new RuntimeException("failed to login to tvdb api");
+        }
+        var token = login.path("data").path("token").asText();
+        Objects.requireNonNull(token);
+
+        // request series information
+        var series =
+                client.get()
+                        .uri("/series/" + req.tvdbId)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .accept(MediaType.APPLICATION_JSON)
+                        .retrieve()
+                        .bodyToMono(JsonNode.class)
+                        .block();
+        Objects.requireNonNull(series);
+        if (!"success".equals(series.path("status").asText())) {
+            throw new RuntimeException("failed to retrieve series from tvdb api");
+        }
+        var name = series.path("data").path("name").asText(null);
+        var image = series.path("data").path("image").asText(null);
+
+        // update the show record
+        ctx.update(SHOW)
+                .set(SHOW.TVDB_ID, req.tvdbId())
+                .set(SHOW.TVDB_NAME, name)
+                .set(SHOW.TVDB_IMAGE, image)
+                .where(SHOW.ID.eq(id))
+                .limit(1)
+                .execute();
     }
 
     @GetMapping(value = "/chart", produces = MediaType.IMAGE_PNG_VALUE)

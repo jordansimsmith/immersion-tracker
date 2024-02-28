@@ -75,6 +75,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web:3.1.4'
     implementation 'org.springframework.boot:spring-boot-starter-jooq:3.1.4'
     implementation 'org.springframework.boot:spring-boot-starter-security:3.1.4'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux:3.1.4'
     implementation 'org.postgresql:postgresql:42.6.0'
     implementation 'org.jfree:jfreechart:1.5.4'
     jooqGenerator 'org.postgresql:postgresql:42.6.0'
