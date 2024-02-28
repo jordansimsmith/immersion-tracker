@@ -12,6 +12,8 @@ function Sync-Episodes-Watched {
 
         Sync-Local-Episodes-Watched $LocalEpisodesWatched $Username $Password
 
+        Update-Remote-Shows $Username $Password
+
         Get-Remote-Episodes-Watched
     }
 }
@@ -84,6 +86,40 @@ function Sync-Local-Episodes-Watched {
     }
 }
 
+function Update-Remote-Shows {
+    [CmdletBinding()]
+    [OutputType([void])]
+    param(
+        [string] $Username,
+        [string] $Password
+    )
+    process {
+        Write-Host "Checking for show metadata updates..."
+
+        $Shows = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/shows"
+        $Shows.shows | 
+        ForEach-Object {
+            if ($_.tvdb_id) {
+                return
+            }
+
+            [int]$id = Read-Host "Enter the TVDB id for show in folder: $($_.folder_name)"
+
+            $Authorization = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $Username, $Password)))
+            $Headers = @{
+                "Authorization" = "Basic " + $Authorization
+                "Content-Type"  = "application/json"
+            }
+            $Body = @{
+                tvdb_id = $id
+            } | ConvertTo-Json
+            Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/shows/$($_.id)" -Method Put -Headers $Headers -Body $Body
+
+            Write-Host "Successfully updated show metadata"
+        }
+    }
+}
+
 function Get-Remote-Episodes-Watched {
     [CmdletBinding()]
     param()
@@ -91,14 +127,14 @@ function Get-Remote-Episodes-Watched {
         Write-Host "Retrieving progress summary..."
         Write-Host
 
-        $Progress = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/shows"
-        $Progress.shows |
+        $Shows = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/shows"
+        $Shows.shows |
         Foreach-Object {
-            $Name = if ($_.tvdb_name) { $.tvdb_name } else { $.folder_name }
+            $Name = if ($_.tvdb_name) { $_.tvdb_name } else { $_.folder_name }
             Write-Host "$($_.episodes_watched) episodes of $Name"
         }
 
         Write-Host
-        Write-Host "$($Progress.total_hours_watched) total hours watched"
+        Write-Host "$($Shows.total_hours_watched) total hours watched"
     }
 }
