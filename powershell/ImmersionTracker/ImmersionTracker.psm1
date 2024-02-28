@@ -14,7 +14,7 @@ function Sync-Episodes-Watched {
 
         Update-Remote-Shows $Username $Password
 
-        Get-Remote-Episodes-Watched
+        Get-Remote-Progress
     }
 }
 
@@ -97,7 +97,7 @@ function Update-Remote-Shows {
         Write-Host "Checking for show metadata updates..."
 
         $Shows = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/shows"
-        $Shows.shows | 
+        $Shows | 
         ForEach-Object {
             if ($_.tvdb_id) {
                 return
@@ -120,21 +120,21 @@ function Update-Remote-Shows {
     }
 }
 
-function Get-Remote-Episodes-Watched {
+function Get-Remote-Progress {
     [CmdletBinding()]
     param()
     process {
         Write-Host "Retrieving progress summary..."
         Write-Host
 
-        $Shows = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/shows"
-        $Shows.shows |
+        $Progress = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/progress"
+        $Progress.shows |
         Foreach-Object {
-            $Name = if ($_.tvdb_name) { $_.tvdb_name } else { $_.folder_name }
+            $Name = if ($_.name) { $_.name } else { 'Unknown' }
             Write-Host "$($_.episodes_watched) episodes of $Name"
         }
 
         Write-Host
-        Write-Host "$($Shows.total_hours_watched) total hours watched"
+        Write-Host "$($Progress.total_hours_watched) total hours watched"
     }
 }
