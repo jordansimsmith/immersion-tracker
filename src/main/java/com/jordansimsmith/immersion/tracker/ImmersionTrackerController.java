@@ -4,6 +4,7 @@ import static com.jordansimsmith.immersion.tracker.jooq.Tables.EPISODE;
 import static com.jordansimsmith.immersion.tracker.jooq.Tables.SHOW;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletResponse;
 import java.awt.*;
 import java.io.ByteArrayOutputStream;
@@ -23,28 +24,31 @@ import org.jooq.DatePart;
 import org.jooq.impl.DSL;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 public class ImmersionTrackerController {
-    public record ProgressResponse(
+    public record ListShowsResponse(
             @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
             @JsonProperty("total_hours_watched") int totalHoursWatched,
-            @JsonProperty("shows_watched") List<ShowProgress> showsWatched) {}
-
-    public record ShowProgress(
-            @JsonProperty("name") String name,
-            @JsonProperty("episodes_watched") int episodesWatched) {}
-
-    public record SyncRequest(
+            @JsonProperty("shows") List<Show> shows) {}
+    public record Show(
+            @JsonProperty("id") int id,
+            @JsonProperty("episodes_watched") int episodesWatched,
+            @JsonProperty("folder_name") String folderName,
+            @Nullable @JsonProperty("tvdb_id") Integer tvdbId,
+            @Nullable @JsonProperty("tvdb_name") String tvdbName,
+            @Nullable @JsonProperty("tvdb_image") String tvdbImage
+            ) {}
+    public record UpdateShowRequest(
+            @JsonProperty("tvdb_id") int tvdbId
+    ) {}
+    public record SyncEpisodesRequest(
             @JsonProperty("folder_name") String folderName,
             @JsonProperty("file_name") String fileName,
             @JsonProperty("timestamp") LocalDateTime timestamp) {}
 
-    public record SyncResponse(@JsonProperty("episodes_added") int episodesAdded) {}
+    public record SyncEpisodesResponse(@JsonProperty("episodes_added") int episodesAdded) {}
 
     private static final int MINUTES_PER_EPISODE = 20;
 
@@ -55,17 +59,15 @@ public class ImmersionTrackerController {
         this.ctx = ctx;
     }
 
-    @GetMapping("/progress")
-    public ProgressResponse progress() {
-        var name = DSL.coalesce(SHOW.TVDB_NAME, SHOW.FOLDER_NAME);
-        var count = DSL.count();
+    @GetMapping("/shows")
+    public ListShowsResponse listShows() {
         var records =
-                ctx.select(name, count)
+                ctx.select(SHOW.ID, DSL.count(), SHOW.FOLDER_NAME, SHOW.TVDB_ID, SHOW.TVDB_NAME, SHOW.TVDB_IMAGE)
                         .from(SHOW)
                         .join(EPISODE)
                         .on(SHOW.ID.eq(EPISODE.SHOW_ID))
-                        .groupBy(SHOW.TVDB_ID, SHOW.TVDB_NAME, SHOW.FOLDER_NAME)
-                        .orderBy(count.desc())
+                        .groupBy(SHOW.ID, SHOW.FOLDER_NAME, SHOW.TVDB_ID, SHOW.TVDB_NAME, SHOW.TVDB_IMAGE)
+                        .orderBy(DSL.count().desc())
                         .fetch();
 
         var totalEpisodesWatched = 0;
@@ -74,13 +76,20 @@ public class ImmersionTrackerController {
         }
         int totalHoursWatched = totalEpisodesWatched * MINUTES_PER_EPISODE / 60;
 
-        var showsWatched = new ArrayList<ShowProgress>();
+        var showsWatched = new ArrayList<Show>();
         for (var record : records) {
-            var show = new ShowProgress(record.value1(), record.value2());
+            var show = new Show(record.value1(), record.value2(), record.value3(), record.value4(), record.value5(), record.value6());
             showsWatched.add(show);
         }
 
-        return new ProgressResponse(totalEpisodesWatched, totalHoursWatched, showsWatched);
+        return new ListShowsResponse(totalEpisodesWatched, totalHoursWatched, showsWatched);
+    }
+
+    @PutMapping("/shows/{id}")
+    public void updateShow(@PathVariable(value="id") int id, @RequestBody UpdateShowRequest req) {
+        // TODO: find tvdb series
+
+        ctx.update(SHOW).set(SHOW.TVDB_ID, req.tvdbId()).where(SHOW.ID.eq(id)).limit(1).execute();
     }
 
     @GetMapping(value = "/chart", produces = MediaType.IMAGE_PNG_VALUE)
@@ -147,22 +156,22 @@ public class ImmersionTrackerController {
     }
 
     @PostMapping("/sync")
-    public SyncResponse sync(@RequestBody List<SyncRequest> syncRequests) {
+    public SyncEpisodesResponse syncEpisodes(@RequestBody List<SyncEpisodesRequest> req) {
         var episodesAdded = new AtomicInteger();
         ctx.transaction(
                 (Configuration txn) -> {
-                    for (var syncMessage : syncRequests) {
+                    for (var episodeMessage : req) {
                         // check if the show already exists
                         var show =
                                 txn.dsl()
                                         .selectFrom(SHOW)
-                                        .where(SHOW.FOLDER_NAME.eq(syncMessage.folderName()))
+                                        .where(SHOW.FOLDER_NAME.eq(episodeMessage.folderName()))
                                         .fetchAny();
 
                         // create the show if it doesn't exist
                         if (show == null) {
                             show = txn.dsl().newRecord(SHOW);
-                            show.setFolderName(syncMessage.folderName());
+                            show.setFolderName(episodeMessage.folderName());
                             show.insert();
                         }
 
@@ -171,21 +180,21 @@ public class ImmersionTrackerController {
                                 txn.dsl()
                                         .selectFrom(EPISODE)
                                         .where(EPISODE.SHOW_ID.eq(show.getId()))
-                                        .and(EPISODE.FILE_NAME.eq(syncMessage.fileName()))
+                                        .and(EPISODE.FILE_NAME.eq(episodeMessage.fileName()))
                                         .fetchAny();
 
                         // create the episode if it doesn't exist
                         if (episode == null) {
                             episode = txn.dsl().newRecord(EPISODE);
                             episode.setShowId(show.getId());
-                            episode.setFileName(syncMessage.fileName());
-                            episode.setTimestamp(syncMessage.timestamp());
+                            episode.setFileName(episodeMessage.fileName());
+                            episode.setTimestamp(episodeMessage.timestamp());
                             episode.insert();
                             episodesAdded.getAndIncrement();
                         }
                     }
                 });
 
-        return new SyncResponse(episodesAdded.get());
+        return new SyncEpisodesResponse(episodesAdded.get());
     }
 }

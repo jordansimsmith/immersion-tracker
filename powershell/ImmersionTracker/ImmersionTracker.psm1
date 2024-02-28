@@ -91,10 +91,11 @@ function Get-Remote-Episodes-Watched {
         Write-Host "Retrieving progress summary..."
         Write-Host
 
-        $Progress = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/progress"
-        $Progress.shows_watched |
+        $Progress = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/shows"
+        $Progress.shows |
         Foreach-Object {
-            Write-Host "$($_.episodes_watched) episodes of $($_.name)"
+            $Name = if ($_.tvdb_name) { $.tvdb_name } else { $.folder_name }
+            Write-Host "$($_.episodes_watched) episodes of $Name"
         }
 
         Write-Host
