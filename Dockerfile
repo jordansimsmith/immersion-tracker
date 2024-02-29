@@ -16,14 +16,8 @@ FROM amazoncorretto:17-alpine AS run
 
 WORKDIR /app
 
-RUN apk update && apk add fontconfig && apk add ttf-dejavu && apk add curl
-
-RUN curl -L -O https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+RUN apk update && apk add fontconfig && apk add ttf-dejavu
 
 COPY --from=build /app/build/libs/immersion.tracker-0.0.1-SNAPSHOT.jar app.jar
-
-ENV JAVA_TOOL_OPTIONS="-javaagent:/app/opentelemetry-javaagent.jar"
-ENV OTEL_SERVICE_NAME="immersion-tracker-server"
-ENV OTEL_EXPORTER_OTLP_ENDPOINT=
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
