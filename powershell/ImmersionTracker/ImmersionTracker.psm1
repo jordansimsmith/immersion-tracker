@@ -136,6 +136,7 @@ function Get-Remote-Progress {
             Write-Host "$($_.episodes_watched) episodes of $Name"
         }
 
+        Write-Host -ForegroundColor Green "$($Progress.episodes_watched_today) episodes watched today"
         Write-Host -ForegroundColor Green "$($Progress.total_hours_watched) total hours watched"
     }
 }
