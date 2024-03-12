@@ -15,6 +15,8 @@ function Sync-Episodes-Watched {
         Update-Remote-Shows $Username $Password
 
         Get-Remote-Progress
+
+        Delete-Local-Episodes-Watched
     }
 }
 
@@ -134,7 +136,35 @@ function Get-Remote-Progress {
             Write-Host "$($_.episodes_watched) episodes of $Name"
         }
 
+        Write-Host -ForegroundColor Green "$($Progress.total_hours_watched) total hours watched"
+    }
+}
+
+function Delete-Local-Episodes-Watched() {
+    [CmdletBinding()]
+    param()
+    process {
+        $Size = 0
+
+        Get-ChildItem -Directory |
+        ForEach-Object {
+            $WatchedPath = Join-Path -Path $_.FullName -ChildPath 'watched'
+
+            if (!(Test-Path -LiteralPath $WatchedPath)) {
+                return
+            }
+
+            Get-ChildItem -LiteralPath $WatchedPath | 
+            ForEach-Object {
+                $Size += $_.Length
+            }
+        }
+
+        $GigaBytes = "{0:n2}" -f ($Size / 1GB)
+
         Write-Host
-        Write-Host "$($Progress.total_hours_watched) total hours watched"
+        Write-Host "$GigaBytes GB of watched episodes can be deleted"
+
+        # TODO: delete watched items
     }
 }
