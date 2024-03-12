@@ -41,7 +41,7 @@ jooq {
                 jdbc {
                     driver = 'org.postgresql.Driver'
                     url = 'jdbc:postgresql://localhost:5432/immersion_tracker'
-                    user = 'immersion_tracker_user'
+                    user = 'user'
                     password = 'password'
                 }
                 generator {

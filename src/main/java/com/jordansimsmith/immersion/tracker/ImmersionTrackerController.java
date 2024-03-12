@@ -38,6 +38,7 @@ public class ImmersionTrackerController {
     public record ProgressResponse(
             @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
             @JsonProperty("total_hours_watched") int totalHoursWatched,
+            @JsonProperty("episodes_watched_today") int episodesWatchedToday,
             @JsonProperty("shows") List<ShowProgress> shows) {}
 
     public record ShowProgress(
@@ -94,7 +95,14 @@ public class ImmersionTrackerController {
             shows.add(show);
         }
 
-        return new ProgressResponse(totalEpisodesWatched, totalHoursWatched, shows);
+        var episodesWatchedToday =
+                ctx.fetchCount(
+                        EPISODE,
+                        DSL.trunc(EPISODE.TIMESTAMP, DatePart.DAY)
+                                .eq(DSL.trunc(DSL.currentLocalDateTime(), DatePart.DAY)));
+
+        return new ProgressResponse(
+                totalEpisodesWatched, totalHoursWatched, episodesWatchedToday, shows);
     }
 
     @GetMapping("/shows")
