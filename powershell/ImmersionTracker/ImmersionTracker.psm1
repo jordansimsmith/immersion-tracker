@@ -79,9 +79,10 @@ function Sync-Local-Episodes-Watched {
         $Authorization = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $Username, $Password)))
         $Headers = @{
             "Authorization" = "Basic " + $Authorization
-            "Content-Type"  = "application/json"
+            "Content-Type"  = "application/json;charset=UTF-8"
         }
-        $Body = $SyncMessages | ConvertTo-Json
+        $Json = $SyncMessages | ConvertTo-Json
+        $Body = [System.Text.Encoding]::UTF8.GetBytes($Json)
 
         $Sync = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/sync" -Method Post -Headers $Headers -Body $Body
         Write-Host "Successfully synced $($Sync.episodes_added) new episodes with the remote server"
