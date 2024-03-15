@@ -11,7 +11,6 @@ import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -238,7 +237,8 @@ public class ImmersionTrackerController {
     }
 
     @PostMapping("/sync")
-    public SyncEpisodesResponse syncEpisodes(@RequestBody List<SyncEpisodesRequest> req, TimeZone timeZone) {
+    public SyncEpisodesResponse syncEpisodes(
+            @RequestBody List<SyncEpisodesRequest> req, TimeZone timeZone) {
         var episodesAdded = new AtomicInteger();
         ctx.transaction(
                 (Configuration txn) -> {
