@@ -11,6 +11,7 @@ import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -59,6 +60,7 @@ public class ImmersionTrackerController {
     public record SyncEpisodesResponse(@JsonProperty("episodes_added") int episodesAdded) {}
 
     private static final int MINUTES_PER_EPISODE = 20;
+    private static final ZoneId AUCKLAND_ZONE_ID = ZoneId.of("Pacific/Auckland");
 
     private final String tvdbApiKey;
     private final DSLContext ctx;
@@ -70,7 +72,7 @@ public class ImmersionTrackerController {
     }
 
     @GetMapping("/progress")
-    public ProgressResponse progress(TimeZone timeZone) {
+    public ProgressResponse progress() {
         var records =
                 ctx.select(SHOW.TVDB_ID, SHOW.TVDB_NAME, DSL.count())
                         .from(SHOW)
@@ -92,7 +94,7 @@ public class ImmersionTrackerController {
             shows.add(show);
         }
 
-        var now = Instant.now().atZone(timeZone.toZoneId()).toLocalDateTime();
+        var now = Instant.now().atZone(AUCKLAND_ZONE_ID).toLocalDateTime();
 
         var episodesWatchedToday =
                 ctx.fetchCount(
@@ -237,13 +239,12 @@ public class ImmersionTrackerController {
     }
 
     @PostMapping("/sync")
-    public SyncEpisodesResponse syncEpisodes(
-            @RequestBody List<SyncEpisodesRequest> req, TimeZone timeZone) {
+    public SyncEpisodesResponse syncEpisodes(@RequestBody List<SyncEpisodesRequest> req) {
         var episodesAdded = new AtomicInteger();
         ctx.transaction(
                 (Configuration txn) -> {
                     for (var episodeMessage : req) {
-                        var now = Instant.now().atZone(timeZone.toZoneId()).toLocalDateTime();
+                        var now = Instant.now().atZone(AUCKLAND_ZONE_ID).toLocalDateTime();
 
                         // check if the show already exists
                         var show =
