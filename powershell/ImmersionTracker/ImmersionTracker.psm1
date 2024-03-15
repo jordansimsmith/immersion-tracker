@@ -64,14 +64,12 @@ function Sync-Local-Episodes-Watched {
     process {
         Write-Host "Syncing $($Episodes.Count) local episodes watched..."
 
-        $Now = (Get-Date).ToString("yyyy-MM-ddThh:mm:ss")
         $SyncMessages = @()
         $Episodes | 
         ForEach-Object {
             $SyncMessage = @{
                 folder_name = $_.FolderName
                 file_name   = $_.FileName
-                timestamp   = $Now
             }
             $SyncMessages += $SyncMessage
         }

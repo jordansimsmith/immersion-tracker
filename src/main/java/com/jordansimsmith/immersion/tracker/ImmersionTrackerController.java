@@ -10,11 +10,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartUtils;
@@ -56,8 +55,7 @@ public class ImmersionTrackerController {
 
     public record SyncEpisodesRequest(
             @JsonProperty("folder_name") String folderName,
-            @JsonProperty("file_name") String fileName,
-            @JsonProperty("timestamp") LocalDateTime timestamp) {}
+            @JsonProperty("file_name") String fileName) {}
 
     public record SyncEpisodesResponse(@JsonProperty("episodes_added") int episodesAdded) {}
 
@@ -73,7 +71,7 @@ public class ImmersionTrackerController {
     }
 
     @GetMapping("/progress")
-    public ProgressResponse progress() {
+    public ProgressResponse progress(TimeZone timeZone) {
         var records =
                 ctx.select(SHOW.TVDB_ID, SHOW.TVDB_NAME, DSL.count())
                         .from(SHOW)
@@ -95,11 +93,13 @@ public class ImmersionTrackerController {
             shows.add(show);
         }
 
+        var now = Instant.now().atZone(timeZone.toZoneId()).toLocalDateTime();
+
         var episodesWatchedToday =
                 ctx.fetchCount(
                         EPISODE,
                         DSL.trunc(EPISODE.TIMESTAMP, DatePart.DAY)
-                                .eq(DSL.trunc(DSL.currentLocalDateTime(), DatePart.DAY)));
+                                .eq(DSL.trunc(now, DatePart.DAY)));
 
         return new ProgressResponse(
                 totalEpisodesWatched, totalHoursWatched, episodesWatchedToday, shows);
@@ -238,11 +238,13 @@ public class ImmersionTrackerController {
     }
 
     @PostMapping("/sync")
-    public SyncEpisodesResponse syncEpisodes(@RequestBody List<SyncEpisodesRequest> req) {
+    public SyncEpisodesResponse syncEpisodes(@RequestBody List<SyncEpisodesRequest> req, TimeZone timeZone) {
         var episodesAdded = new AtomicInteger();
         ctx.transaction(
                 (Configuration txn) -> {
                     for (var episodeMessage : req) {
+                        var now = Instant.now().atZone(timeZone.toZoneId()).toLocalDateTime();
+
                         // check if the show already exists
                         var show =
                                 txn.dsl()
@@ -270,7 +272,7 @@ public class ImmersionTrackerController {
                             episode = txn.dsl().newRecord(EPISODE);
                             episode.setShowId(show.getId());
                             episode.setFileName(episodeMessage.fileName());
-                            episode.setTimestamp(episodeMessage.timestamp());
+                            episode.setTimestamp(now);
                             episode.insert();
                             episodesAdded.getAndIncrement();
                         }
