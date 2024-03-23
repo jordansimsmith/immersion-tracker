@@ -62,6 +62,11 @@ function Sync-Local-Episodes-Watched {
         [string] $Password
     )
     process {
+        if (!($Episodes)) {
+            Write-Host "No local episodes watched, skipping..."
+            return
+        }
+
         Write-Host "Syncing $($Episodes.Count) local episodes watched..."
 
         $SyncMessages = @()
@@ -144,6 +149,8 @@ function Delete-Local-Episodes-Watched() {
     [CmdletBinding()]
     param()
     process {
+        Write-Host
+        Write-Host "Checking for watched episodes to delete..."
         $Size = 0
 
         Get-ChildItem -Directory |
@@ -156,15 +163,14 @@ function Delete-Local-Episodes-Watched() {
 
             Get-ChildItem -LiteralPath $WatchedPath | 
             ForEach-Object {
+                Remove-Item -LiteralPath $_.FullName
                 $Size += $_.Length
             }
         }
 
-        $GigaBytes = "{0:n2}" -f ($Size / 1GB)
-
-        Write-Host
-        Write-Host "$GigaBytes GB of watched episodes can be deleted"
-
-        # TODO: delete watched items
+        if ($Size) {
+            $GigaBytes = "{0:n2}" -f ($Size / 1GB)
+            Write-Host "$GigaBytes GB of watched episodes were deleted"
+        }
     }
 }

@@ -17,5 +17,6 @@ catch {
     Write-Host -ForegroundColor Red $_
 }
 finally {
+    Write-Host
     Pause
 }
