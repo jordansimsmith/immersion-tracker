@@ -163,8 +163,13 @@ function Delete-Local-Episodes-Watched() {
 
             Get-ChildItem -LiteralPath $WatchedPath | 
             ForEach-Object {
-                Remove-Item -LiteralPath $_.FullName
-                $Size += $_.Length
+                try {
+                    Remove-Item -LiteralPath $_.FullName
+                    $Size += $_.Length
+                }
+                catch {
+                    # inaccessible file, probably in use, skip
+                }
             }
         }
 
