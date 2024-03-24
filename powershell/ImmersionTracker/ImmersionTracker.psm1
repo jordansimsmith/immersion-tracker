@@ -63,7 +63,7 @@ function Sync-Local-Episodes-Watched {
     )
     process {
         if (!($Episodes)) {
-            Write-Host "No local episodes watched, skipping..."
+            Write-Host "No local episodes watched, skipping"
             return
         }
 
@@ -84,7 +84,7 @@ function Sync-Local-Episodes-Watched {
             "Authorization" = "Basic " + $Authorization
             "Content-Type"  = "application/json;charset=UTF-8"
         }
-        $Json = $SyncMessages | ConvertTo-Json
+        $Json = ConvertTo-Json $SyncMessages
         $Body = [System.Text.Encoding]::UTF8.GetBytes($Json)
 
         $Sync = Invoke-RestMethod -Uri "https://immersion-tracker.jordansimsmith.com/sync" -Method Post -Headers $Headers -Body $Body
